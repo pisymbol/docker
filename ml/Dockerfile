@@ -110,7 +110,7 @@ RUN pip3 --no-cache-dir install \
 	wordcloud \
 	zmq
 
-# Instal Intel DNN
+# Install Intel DNN
 RUN git clone https://github.com/intel/mkl-dnn.git && \
 	cd mkl-dnn/scripts && ./prepare_mkl.sh && \
 	cd .. && mkdir -p build && cd build && cmake .. && \
@@ -156,7 +156,7 @@ RUN wget -q -O spark.tgz http://mirror.olnevhost.net/pub/apache/spark/spark-2.4.
 
 # Install various odds and ends and make sure modules are
 # the latest (some packages above may have pulled in older
-# dependencies and we need to upgrade them.
+# dependencies and we need to upgrade them now).
 RUN pip3 install torch_nightly torchvision-nightly -f https://download.pytorch.org/whl/nightly/cu92/torch_nightly.html
 RUN pip3 install --upgrade fake_useragent click ipython bokeh flask pytest coverage gunicorn
 RUN pip3 install --upgrade bcolz theano kaggle-cli pymc3 animation graphviz
@@ -164,12 +164,15 @@ RUN pip3 install --upgrade numpy notebook jupyter jupyterlab scipy kaggle urllib
 RUN pip3 install --upgrade awscli mwparserfromhell --upgrade
 RUN jupyter serverextension enable --py jupyterlab --sys-prefix
 
-# Download spacy embeddings
+# Download all spacy embeddings
 RUN python3 -m spacy download en
 RUN python3 -m spacy download en_core_web_sm
 RUN python3 -m spacy download en_core_web_md
 RUN python3 -m spacy download en_core_web_lg
 RUN python3 -m spacy download en_vectors_web_lg
+
+# Install nltk 
+RUN python3 -c "import nltk; nltk.download('all')"
 
 # Allow plotly and bokeh to display in JupyterLab
 RUN jupyter labextension install @jupyterlab/plotly-extension
@@ -181,12 +184,14 @@ RUN curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
 # Clean up
 RUN rm -rf /root/* && chmod 755 /root
 
-# Install my complete home environment under a container
+# Install my complete custom home environment under a container
 RUN useradd -ms /bin/bash -d /home/pisymbol -p $(openssl passwd -1 docker) -G sudo pisymbol
 USER pisymbol
-RUN python3 -c "import nltk; nltk.download('all')"
+
+# Shell
 ENV LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib
 ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/spark/bin
+
 RUN echo "set -o vi" >> /home/pisymbol/.bashrc
 RUN echo "alias nb='jupyter notebook --no-browser --allow-root --port 8888 --NotebookApp.iopub_data_rate_limit=10000000000'" >> /home/pisymbol/.bashrc
 RUN echo "alias python='python3'" >> /home/pisymbol/.bashrc
@@ -197,17 +202,24 @@ RUN echo "export PYSPARK_PYTHON=python3" >> /home/pisymbol/.bashrc
 RUN echo "export HADOOP_OPTS=\"$HADOOP_OPTS -Djava.library.path=$HADOOP_HOME/lib/native\"" >> /home/pisymbol/.bashrc
 COPY vimrc  /home/pisymbol/.vimrc
 COPY vim /home/pisymbol/.vim
+
+# Git settings
 RUN git config --global user.email "pisymbol@gmail.com"
 RUN git config --global user.name "Alexander Sack"
+
 RUN jupyter notebook --generate-config
 RUN sed -i -E 's,^#\s*c.NotebookApp.terminado_settings.*,c.NotebookApp.terminado_settings = {"shell_command" : ["\/bin\/bash"]},g' ~/.jupyter/jupyter_notebook_config.py
+RUN mkdir -p /home/pisymbol/.ipython/profile_default
+RUN echo "c.TerminalInteractiveShell.editing_mode = 'vi'" >> /home/pisymbol/.ipython/profile_default/ipython_config.py
+
+# Kaggle setup
 RUN mkdir -p /home/pisymbol/.kaggle
 COPY --chown=pisymbol:pisymbol kaggle.json /home/pisymbol/.kaggle
 RUN mkdir -p /home/pisymbol/Development/kaggle
 RUN kaggle config set -n path -v ~/kaggle
 RUN sed -i -E 's,kaggle,Development/kaggle,g' /home/pisymbol/.kaggle/kaggle.json
-RUN mkdir -p /home/pisymbol/.ipython/profile_default
-RUN echo "c.TerminalInteractiveShell.editing_mode = 'vi'" >> /home/pisymbol/.ipython/profile_default/ipython_config.py
+
+# Required spark configuration for local user access
 ENV SPARK_HOME=/usr/local/spark
 ENV PYTHONPATH=/usr/local/spark/python:/usr/local/spark/python/lib/py4j-0.10.4-src.zip
 ENV PATH=/usr/local/spark/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/spark/bin
