@@ -160,7 +160,7 @@ RUN wget -q -O spark.tgz http://mirror.olnevhost.net/pub/apache/spark/spark-2.4.
 RUN pip3 install torch_nightly torchvision-nightly -f https://download.pytorch.org/whl/nightly/cu92/torch_nightly.html
 RUN pip3 install --upgrade fake_useragent click ipython bokeh flask pytest coverage gunicorn
 RUN pip3 install --upgrade bcolz theano kaggle-cli pymc3 animation graphviz
-RUN pip3 install --upgrade numpy notebook jupyter jupyterlab scipy kaggle urllib3 spacy spacy[cuda92] gensim plotly quandl fastai tornado==5.1.1
+RUN pip3 install --upgrade numpy notebook jupyter jupyterlab scipy kaggle urllib3 spacy spacy[cuda92] gensim plotly quandl fastai tornado==5.1.1 ipython-sql
 RUN pip3 install --upgrade awscli mwparserfromhell --upgrade
 RUN jupyter serverextension enable --py jupyterlab --sys-prefix
 
