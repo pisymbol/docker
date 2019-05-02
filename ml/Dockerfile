@@ -161,8 +161,10 @@ RUN pip3 install torch_nightly torchvision-nightly -f https://download.pytorch.o
 RUN pip3 install --upgrade fake_useragent click ipython bokeh flask pytest coverage gunicorn
 RUN pip3 install --upgrade bcolz theano kaggle-cli pymc3 animation graphviz
 RUN pip3 install --upgrade numpy notebook jupyter jupyterlab scipy kaggle urllib3 spacy spacy[cuda92] gensim plotly quandl fastai tornado==5.1.1 ipython-sql
-RUN pip3 install --upgrade awscli mwparserfromhell --upgrade
+RUN pip3 install --upgrade awscli mwparserfromhell
+RUN pip3 install --upgrade jupytext
 RUN jupyter serverextension enable --py jupyterlab --sys-prefix
+RUN jupyter nbextension install --py jupytext && jupyter nbextension enable --py jupytext
 
 # Download all spacy embeddings
 RUN python3 -m spacy download en
@@ -180,6 +182,9 @@ RUN jupyter labextension install jupyterlab_bokeh
 
 # Install Heroku
 RUN curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
+
+# Upgrade to 2.0
+RUN pip3 install tensorflow-gpu==2.0.0-alpha0
 
 # Clean up
 RUN rm -rf /root/* && chmod 755 /root
@@ -200,8 +205,9 @@ RUN echo "export LANG=C.UTF-8" >> /home/pisymbol/.bashrc
 RUN echo "export SPARK_HOME=/usr/local/spark" >> /home/pisymbol/.bashrc
 RUN echo "export PYSPARK_PYTHON=python3" >> /home/pisymbol/.bashrc
 RUN echo "export HADOOP_OPTS=\"$HADOOP_OPTS -Djava.library.path=$HADOOP_HOME/lib/native\"" >> /home/pisymbol/.bashrc
-COPY vimrc  /home/pisymbol/.vimrc
-COPY vim /home/pisymbol/.vim
+COPY --chown=pisymbol vimrc /home/pisymbol/.vimrc
+COPY --chown=pisymbol vim /home/pisymbol/.vim
+RUN curl -q https://raw.githubusercontent.com/goerz/jupytext.vim/master/plugin/jupytext.vim > ~/.vim/plugin/jupytext.vim
 
 # Git settings
 RUN git config --global user.email "pisymbol@gmail.com"
@@ -209,6 +215,8 @@ RUN git config --global user.name "Alexander Sack"
 
 RUN jupyter notebook --generate-config
 RUN sed -i -E 's,^#\s*c.NotebookApp.terminado_settings.*,c.NotebookApp.terminado_settings = {"shell_command" : ["\/bin\/bash"]},g' ~/.jupyter/jupyter_notebook_config.py
+# Setup password authentication so we don't have to remember tokens
+RUN echo "{ \"NotebookApp\": { \"password\": \"sha1:6c96a4e0f51a:b5416c8e9f3ce4404844ad76838fca509c4322dc\" } }" >> ~/.jupyter/jupyter_notebook_config.json
 RUN mkdir -p /home/pisymbol/.ipython/profile_default
 RUN echo "c.TerminalInteractiveShell.editing_mode = 'vi'" >> /home/pisymbol/.ipython/profile_default/ipython_config.py
 
