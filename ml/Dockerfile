@@ -1,18 +1,17 @@
 FROM nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04
 
-ARG NVIDIA_DRIVER=nvidia-driver
-ARG NVIDIA_DRIVER_VER=415
-ARG NVIDIA_DRIVER_MINOR_VER=27
-ARG OPENCV_VER=4.0.1
+ARG OPENCV_VER=4.1.0
 
 WORKDIR /root
 CMD ["/bin/bash"]
+
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
+    apt-get clean && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Install a base time build environment
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	apt-utils \
 	build-essential \
-	cmake \
 	ctags \
 	curl \
 	git \
@@ -23,12 +22,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	vim && \
     apt-get clean && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
-# We could use nvidia-docker and probably should. But instead we will just
-# install the same version as our host system so driver version match.
-RUN echo "yes" | add-apt-repository ppa:graphics-drivers/ppa
-RUN apt-get update && apt-get install -y \
-	${NVIDIA_DRIVER}-${NVIDIA_DRIVER_VER} && \
-	apt-get clean && apt-get autoremove && rm -rf /var/lib/apt/lists/*
 
 # Ensure CUDA is in our run-time loader's path
 RUN cd /usr/local && echo '/usr/local/cuda/lib64' > /etc/ld.so.conf.d/cuda.conf && ldconfig
@@ -73,6 +66,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	unzip && \
     apt-get clean && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
+RUN wget https://github.com/Kitware/CMake/releases/download/v3.15.2/cmake-3.15.2.tar.gz && tar -xvf cmake*tar.gz && cd cmake* && ./bootstrap && make && make install
+
 # Get the latest pip3
 RUN wget -q https://bootstrap.pypa.io/get-pip.py && python3 get-pip.py && rm -f get-pip.py
 
@@ -105,16 +100,14 @@ RUN pip3 --no-cache-dir install \
 	pyopenssl \
 	six \
 	sphinx \
-	tensorflow-gpu \
 	wheel \
 	wordcloud \
 	zmq
 
 # Install Intel DNN
 RUN git clone https://github.com/intel/mkl-dnn.git && \
-	cd mkl-dnn/scripts && ./prepare_mkl.sh && \
-	cd .. && mkdir -p build && cd build && cmake .. && \
-	make && make install
+	cd mkl-dnn && mkdir -p build && cd build && cmake .. && \
+	make -j4 && make install
 
 # Install XGBoost
 RUN git clone --recursive https://github.com/dmlc/xgboost && \
@@ -132,8 +125,8 @@ RUN wget -q -O opencv-${OPENCV_VER}.zip https://github.com/opencv/opencv/archive
     	echo 'ln /dev/null /dev/raw1394' >> ~/.bashrc && rm -rf /root/opencv*
 
 # Install OpenMPI
-RUN wget -q https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.0.tar.gz && tar -zxf openmpi-4.0.0.tar.gz && \
-	cd openmpi-4.0.0 && ./configure --prefix=/usr/local/mpi && \
+RUN wget -q https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.1.tar.gz && tar -zxf openmpi-4.0.1.tar.gz && \
+	cd openmpi-4.0.1 && ./configure --prefix=/usr/local/mpi && \
     	make && make install
 
 # Need to use gcc-7 for OpenCV compilation (this may change)
@@ -149,15 +142,12 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 RUN update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-8-openjdk-amd64/bin/java 10000
 
 # Install Spark
-RUN wget -q -O spark.tgz http://mirror.olnevhost.net/pub/apache/spark/spark-2.4.0/spark-2.4.0-bin-hadoop2.7.tgz && \
+RUN wget -q -O spark.tgz http://mirror.olnevhost.net/pub/apache/spark/spark-2.4.3/spark-2.4.3-bin-hadoop2.7.tgz && \
 	mkdir -p /usr/local && tar -xf spark.tgz -C /usr/local && \
-    	mv /usr/local/spark*2.4.0* /usr/local/spark && \
+    	mv /usr/local/spark*2.4.3* /usr/local/spark && \
     	pip3 install --upgrade pyspark
 
-# Install various odds and ends and make sure modules are
-# the latest (some packages above may have pulled in older
-# dependencies and we need to upgrade them now).
-RUN pip3 install torch_nightly torchvision-nightly -f https://download.pytorch.org/whl/nightly/cu92/torch_nightly.html
+RUN pip3 install torch torchvision
 RUN pip3 install --upgrade fake_useragent click ipython bokeh flask pytest coverage gunicorn
 RUN pip3 install --upgrade bcolz theano kaggle-cli pymc3 animation graphviz
 RUN pip3 install --upgrade numpy notebook jupyter jupyterlab scipy kaggle urllib3 spacy spacy[cuda92] gensim plotly quandl fastai tornado==5.1.1 ipython-sql
@@ -184,7 +174,7 @@ RUN jupyter labextension install jupyterlab_bokeh
 RUN curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
 
 # Upgrade to 2.0
-RUN pip3 install tensorflow-gpu==2.0.0-alpha0
+RUN pip3 install tensorflow-gpu==2.0.0-rc0
 
 # Clean up
 RUN rm -rf /root/* && chmod 755 /root
